@@ -1,3 +1,4 @@
+// Need to rebuild
 /**
  * NNStreamer Common Header, Typedef part, for export as devel package.
  * Copyright (C) 2018 MyungJoo Ham <myungjoo.ham@samsung.com>
