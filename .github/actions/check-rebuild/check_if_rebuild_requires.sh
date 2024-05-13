@@ -14,7 +14,8 @@
 #                  debian: check if pdebuild is required
 #                  android: check if jni rebuild is required
 #                  build (default): check if general meson rebuild is required.
-
+echo $1
+echo $2
 if [ -z $1 ]; then
   echo "::error The argument (file path) is not given."
   exit 1
