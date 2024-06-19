@@ -103,7 +103,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE    := tensor_repo_dynamic_test
 LOCAL_SRC_FILES += ../tests/nnstreamer_repo_dynamicity/tensor_repo_dynamic_test.c
 LOCAL_CFLAGS    += -O0 -DVERSION=\"$(NNSTREAMER_VERSION)\"
-LOCAL_CXXFLAGS  += -std=c++11 -DVERSION=\"$(NNSTREAMER_VERSION)\"
+LOCAL_CXXFLAGS  += -DVERSION=\"$(NNSTREAMER_VERSION)\"
 LOCAL_LDLIBS    += -llog
 #LOCAL_LDFLAGS  += $(CUSTOM_LINKER64)
 LOCAL_LDFLAGS   += -fuse-ld=bfd
