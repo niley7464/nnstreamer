@@ -94,20 +94,8 @@ LOCAL_MODULE        := nnstreamer
 LOCAL_SRC_FILES     := $(NNSTREAMER_COMMON_SRCS) $(NNSTREAMER_PLUGINS_SRCS)
 LOCAL_C_INCLUDES    := $(NNSTREAMER_INCLUDES)
 
-BUILDING_BLOCK_LIST := gstreamer-1.0 glib-2.0 gobject-2.0 intl gstcoreelements \
-gstapp pixman-1 fontconfig expat freetype \
-gstvideoconvert gstvideorate gstvideoscale \
-gmodule-2.0 iconv png16 gstpng gstmultifile gio-2.0 \
-gstbase-1.0 gstvideo-1.0 tag-1.0 orc app-1.0 badbase-1.0 gthread \
-cairo pixman gstbadvideo gstcontroller jpeg gstpbutils gstallocators \
-bz2 harfbuzz z
-
-ifeq ($(NO_AUDIO), false)
-BUILDING_BLOCK_LIST += gstaudio-1.0 gstbadaudio-1.0 gstaudioconvert gstaudiomixer gstaudiorate gstaudioresample gstaudiotestsrc
-endif
-
 LOCAL_C_INCLUDES += $(GST_HEADERS_COMMON)
 
-LOCAL_SHARED_LIBRARIES := $(BUILDING_BLOCK_LIST) gstreamer_android
+LOCAL_SHARED_LIBRARIES := gstreamer_android
 
 include $(BUILD_SHARED_LIBRARY)
