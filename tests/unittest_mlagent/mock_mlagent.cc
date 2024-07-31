@@ -80,9 +80,13 @@ bool
 ml_agent_mock_model_add (const gchar *name, const gchar *path, const gchar *app_info,
     const bool is_activated, const char *desc, const guint version)
 {
-  MockModel model{ name, path, app_info, is_activated, desc, version };
+  bool ret = true;
+  MockModel* model = new MockModel(name, path, app_info, is_activated, desc, version);
 
-  return uptr_mock->model_add (model);
+  ret = uptr_mock->model_add (model);
+  delete model;
+
+  return ret;
 }
 
 /**

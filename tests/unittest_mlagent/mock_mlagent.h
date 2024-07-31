@@ -211,20 +211,20 @@ struct MockMLAgent {
   /**
    * @brief Add mock model to model repo.
    */
-  bool model_add (MockModel model)
+  bool model_add (MockModel* model)
   {
-    std::string key = model.name ();
+    std::string key = model->name ();
 
     {
       auto range = models_dict_.equal_range (key);
 
       for (auto it = range.first; it != range.second; ++it) {
-        if (model == it->second)
+        if (*model == it->second)
           return false;
       }
     }
 
-    models_dict_.insert (std::make_pair (key, model));
+    models_dict_.insert (std::make_pair (key, *model));
 
     return true;
   }
