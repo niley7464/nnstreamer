@@ -260,6 +260,19 @@ gst_tensor_generator_collected (GstCollectPads * pads,
 
   self = GST_TENSOR_GENERATOR (user_data);
 
+  if (!gst_pad_has_current_caps (self->srcpad)) {
+    GstTensorsConfig config;
+    GstCaps *caps;
+
+    gst_tensors_config_init (&config);
+    config.info.format = _NNS_TENSOR_FORMAT_FLEXIBLE;
+    config.rate_d = self->in_config.rate_d;
+    config.rate_n = self->in_config.rate_n;
+    caps = gst_tensors_caps_from_config (&config);
+    gst_pad_set_caps (self->srcpad, caps);
+    gst_caps_unref (caps);
+  }
+
   for (walk = pads->data; walk; walk = g_slist_next (walk)) {
     GstCollectData *data;
 
