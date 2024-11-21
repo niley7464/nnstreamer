@@ -29,6 +29,7 @@ struct _GstTensorGenerator
 
   GstPad *sinkpad; /**< sink pad */
   GstPad *srcpad; /**< src pad */
+  GstTensorsConfig in_config; /**< input tensors config */
 };
 
 /**

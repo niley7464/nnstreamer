@@ -96,6 +96,8 @@ gst_tensor_generator_init (GstTensorGenerator * self)
   gst_element_add_pad (GST_ELEMENT (self), self->srcpad);
   gst_pad_set_chain_function (self->sinkpad,
       GST_DEBUG_FUNCPTR (gst_tensor_generator_chain));
+
+  gst_tensors_config_init (&self->in_config);
 }
 
 /**
@@ -186,9 +188,23 @@ gst_tensor_generator_src_event (GstPad * pad, GstObject * parent, GstEvent * eve
 static gboolean
 gst_tensor_generator_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
 {
+  GstTensorGenerator *self;
   g_return_val_if_fail (event != NULL, FALSE);
+  self = GST_TENSOR_GENERATOR (parent);
 
   switch (GST_EVENT_TYPE (event)) {
+    case GST_EVENT_CAPS:
+      {
+        GstCaps *caps;
+        GstStructure *structure;
+
+        gst_event_parse_caps (event, &caps);
+        structure = gst_caps_get_structure (caps, 0);
+        gst_tensors_config_from_structure (&self->in_config, structure);
+        gst_event_unref (event);
+
+        return TRUE;
+      }
     case GST_EVENT_SEEK:
       /* disable seeking */
       gst_event_unref (event);
@@ -204,11 +220,31 @@ static GstFlowReturn
 gst_tensor_generator_chain (GstPad * sinkpad, GstObject * parent,
     GstBuffer * inbuf)
 {
-    UNUSED (sinkpad);
-    UNUSED (parent);
+    GstTensorGenerator *self;
+    GstTensorsInfo infos;
+    GstBuffer *result;
+    GstMemory *mem;
+    guint8 *data;
+    GstCaps *caps;
+    gsize mem_size;
+
     UNUSED (inbuf);
+    UNUSED (sinkpad);
 
-    ml_loge("chain");
+    self = GST_TENSOR_GENERATOR (parent);
 
-    return GST_FLOW_OK;
+    /* TODO : Create out_config */
+    infos = self->in_config.info;
+    result = gst_buffer_new ();
+    mem_size = gst_tensor_info_get_size (&infos.info[0]);
+    data = (guint8 *) g_malloc0 (mem_size);
+    mem = gst_memory_new_wrapped (0, data, mem_size, 0, mem_size, data, g_free);
+    gst_tensor_buffer_append_memory (result, mem, &infos.info[0]);
+
+    caps = gst_tensors_caps_from_config (&self->in_config);
+
+    gst_pad_set_caps (self->srcpad, caps);
+    gst_caps_unref (caps);
+
+    return gst_pad_push (self->srcpad, result);
 }
