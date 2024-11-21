@@ -38,10 +38,10 @@ static GstStateChangeReturn gst_tensor_generator_change_state (GstElement * elem
     GstStateChange transition);
 static gboolean gst_tensor_generator_src_event (GstPad * pad, GstObject * parent,
     GstEvent * event);
-static gboolean gst_tensor_generator_sink_event (GstPad * pad, GstObject * parent,
-    GstEvent * event);
-static GstFlowReturn gst_tensor_generator_chain (GstPad * sinkpad, GstObject * parent,
-    GstBuffer * inbuf);
+static gboolean gst_tensor_generator_sink_event (GstCollectPads * pads, GstCollectData * data,
+    GstEvent * event, gpointer user_data);
+static GstFlowReturn gst_tensor_generator_collected (GstCollectPads * pads,
+    gpointer user_data);
 
 /**
  * @brief Initialize the tensor_generator's class.
@@ -85,17 +85,22 @@ gst_tensor_generator_init (GstTensorGenerator * self)
 {
   /* setup sink pad */
   self->sinkpad = gst_pad_new_from_static_template (&sink_template, "sink");
-  gst_pad_set_event_function (self->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_tensor_generator_sink_event));
   gst_element_add_pad (GST_ELEMENT (self), self->sinkpad);
+
+  self->collect = gst_collect_pads_new ();
+  gst_collect_pads_set_function (self->collect,
+      GST_DEBUG_FUNCPTR (gst_tensor_generator_collected), self);
+  gst_collect_pads_set_event_function (self->collect,
+      GST_DEBUG_FUNCPTR (gst_tensor_generator_sink_event), self);
+
+  gst_collect_pads_add_pad (self->collect, self->sinkpad,
+      sizeof (GstTensorCollectPadData), NULL, TRUE);
 
   /* setup src pad */
   self->srcpad = gst_pad_new_from_static_template (&src_template, "src");
   gst_pad_set_event_function (self->srcpad,
       GST_DEBUG_FUNCPTR (gst_tensor_generator_src_event));
   gst_element_add_pad (GST_ELEMENT (self), self->srcpad);
-  gst_pad_set_chain_function (self->sinkpad,
-      GST_DEBUG_FUNCPTR (gst_tensor_generator_chain));
 
   gst_tensors_config_init (&self->in_config);
 }
@@ -145,9 +150,18 @@ gst_tensor_generator_get_property (GObject * object, guint prop_id,
 static GstStateChangeReturn
 gst_tensor_generator_change_state (GstElement * element, GstStateChange transition)
 {
+  GstTensorGenerator *self;
   GstStateChangeReturn ret;
 
+  self = GST_TENSOR_GENERATOR (element);
+
   switch (transition) {
+    case GST_STATE_CHANGE_READY_TO_PAUSED:
+      gst_collect_pads_start (self->collect);
+      break;
+    case GST_STATE_CHANGE_PAUSED_TO_READY:
+      gst_collect_pads_stop (self->collect);
+      break;
     default:
       break;
   }
@@ -186,11 +200,13 @@ gst_tensor_generator_src_event (GstPad * pad, GstObject * parent, GstEvent * eve
  * @brief Handle event on sink pad.
  */
 static gboolean
-gst_tensor_generator_sink_event (GstPad * pad, GstObject * parent, GstEvent * event)
+gst_tensor_generator_sink_event (GstCollectPads * pads, GstCollectData * data,
+    GstEvent * event, gpointer user_data)
 {
   GstTensorGenerator *self;
   g_return_val_if_fail (event != NULL, FALSE);
-  self = GST_TENSOR_GENERATOR (parent);
+
+  self = GST_TENSOR_GENERATOR (user_data);
 
   switch (GST_EVENT_TYPE (event)) {
     case GST_EVENT_CAPS:
@@ -213,38 +229,49 @@ gst_tensor_generator_sink_event (GstPad * pad, GstObject * parent, GstEvent * ev
       break;
   }
 
-  return gst_pad_event_default (pad, parent, event);
+  return gst_collect_pads_event_default (pads, data, event, FALSE);
 }
 
 static GstFlowReturn
-gst_tensor_generator_chain (GstPad * sinkpad, GstObject * parent,
-    GstBuffer * inbuf)
+gst_tensor_generator_chain (GstTensorGenerator *self, GstCollectData * data)
 {
-    GstTensorGenerator *self;
-    GstTensorsInfo infos;
-    GstBuffer *result;
-    GstMemory *mem;
-    guint8 *data;
-    GstCaps *caps;
-    gsize mem_size;
+  GstFlowReturn ret;
+  GstBuffer *result;
 
-    UNUSED (inbuf);
-    UNUSED (sinkpad);
+  /* TODO : Create out_config */
+  result = gst_collect_pads_peek (self->collect, data);
+  result = gst_tensor_buffer_from_config (result, &self->in_config);
 
-    self = GST_TENSOR_GENERATOR (parent);
+  ret = gst_pad_push (self->srcpad, result);
 
-    /* TODO : Create out_config */
-    infos = self->in_config.info;
-    result = gst_buffer_new ();
-    mem_size = gst_tensor_info_get_size (&infos.info[0]);
-    data = (guint8 *) g_malloc0 (mem_size);
-    mem = gst_memory_new_wrapped (0, data, mem_size, 0, mem_size, data, g_free);
-    gst_tensor_buffer_append_memory (result, mem, &infos.info[0]);
+  if (result)
+    gst_buffer_unref (gst_collect_pads_pop (self->collect, data));
 
-    caps = gst_tensors_caps_from_config (&self->in_config);
+  return ret;
+}
 
-    gst_pad_set_caps (self->srcpad, caps);
-    gst_caps_unref (caps);
+static GstFlowReturn
+gst_tensor_generator_collected (GstCollectPads * pads,
+    gpointer user_data)
+{
+  GstTensorGenerator *self;
+  GstCollectData *data_raw;
+  GSList *walk;
 
-    return gst_pad_push (self->srcpad, result);
+  self = GST_TENSOR_GENERATOR (user_data);
+
+  for (walk = pads->data; walk; walk = g_slist_next (walk)) {
+    GstCollectData *data;
+
+    data = (GstCollectData *) walk->data;
+
+    if (GST_COLLECT_PADS_STATE_IS_SET (data, GST_COLLECT_PADS_STATE_EOS)) {
+      gst_pad_push_event (self->srcpad, gst_event_new_eos ());
+      return GST_FLOW_EOS;
+    }
+
+    data_raw = data;
+  }
+
+  return gst_tensor_generator_chain (self, data_raw);
 }
