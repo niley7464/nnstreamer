@@ -33,7 +33,12 @@ struct _GstTensorGenerator
   GstTensorsConfig in_config; /**< input tensors config */
 
   /* <private> */
+  GstElement element_signal;
+  GstPad *sinkpad_signal; /**< sink signal */
+  GstPad *srcpad_signal; /**< src signal */
   GstCollectPads *collect; /**< sink pads */
+  GThread *thread;
+  gboolean running;
 };
 
 /**
