@@ -399,6 +399,8 @@ _gst_tensor_debug_output (GstTensorDebug * self, GstBuffer * buffer)
   UNUSED (self);
   UNUSED (buffer);
   /** @todo NYI: do the debug task */
+
+  ml_loge ("new tokens");
 }
 
 /**
